@@ -42,3 +42,14 @@ htmlcov/
 .codegraph
 /docs/superpowers
 .understand-anything
+
+# OAuth & Security Tokens
+client_secret.json
+client_secret*.json
+token.pickle
+token.json
+
+# Local Generated Media & Outputs
+*.mp4
+*.srt
+
