@@ -49,15 +49,15 @@ def parse_srt(srt_content):
 
 def write_srt(blocks):
     """
-    Reconstruct SRT content from parsed blocks
+    Reconstruct SRT content from parsed blocks ensuring trailing double newline
     """
     out = []
     for b in blocks:
-        out.append(b['index'])
-        out.append(b['times'])
-        out.append(b['text'])
+        out.append(str(b['index']))
+        out.append(str(b['times']))
+        out.append(str(b['text']))
         out.append('')
-    return '\n'.join(out)
+    return '\n'.join(out).strip() + '\n\n'
 
 def split_sentences(text):
     """
@@ -83,6 +83,9 @@ def main():
     parser.add_argument("--translation", required=True, help="English translation script content or path to text file containing it")
     parser.add_argument("--terms", required=True, help="Comma-separated Pexels search terms (one per sentence)")
     parser.add_argument("--output-name", default=None, help="Name for the final output video file (e.g. 'bhangarh.mp4')")
+    parser.add_argument("--bgm-type", default="random", choices=["random", "custom", "none"], help="Background music type: random, custom, or none")
+    parser.add_argument("--bgm-file", default="", help="Path to custom background music audio file (if --bgm-type is custom)")
+    parser.add_argument("--bgm-volume", type=float, default=0.15, help="Background music volume (0.0 to 1.0, default 0.15)")
     args = parser.parse_args()
 
     # Pre-Flight Configuration Checks
@@ -137,6 +140,8 @@ def main():
     task_id = utils.get_uuid()
     logger.info(f"Generated task ID: {task_id}")
 
+    bgm_type_val = None if args.bgm_type == "none" else args.bgm_type
+
     # Build video parameters matching the finalized audio/video specifications
     params = VideoParams(
         video_subject=args.subject,
@@ -151,6 +156,9 @@ def main():
         text_background_color=True,
         video_concat_mode="sequential",
         match_materials_to_script=True,
+        bgm_type=bgm_type_val,
+        bgm_file=args.bgm_file,
+        bgm_volume=args.bgm_volume,
         n_threads=2,
     )
 
