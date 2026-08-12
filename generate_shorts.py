@@ -76,6 +76,69 @@ def split_sentences(text):
                 sentences.append(part)
     return sentences
 
+def format_srt_time(seconds):
+    hrs = int(seconds // 3600)
+    mins = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    millis = int(round((seconds - int(seconds)) * 1000))
+    if millis >= 1000:
+        millis -= 1000
+        secs += 1
+    return f"{hrs:02d}:{mins:02d}:{secs:02d},{millis:03d}"
+
+def chunk_subtitle_blocks(blocks, max_words=5):
+    """
+    Split long subtitle blocks into short 3-6 word phrases for high-retention Shorts styling.
+    """
+    from moviepy.tools import convert_to_seconds
+    new_blocks = []
+    block_index = 1
+    for block in blocks:
+        text = block['text'].strip()
+        words = text.split()
+        if len(words) <= max_words:
+            new_blocks.append({
+                'index': str(block_index),
+                'times': block['times'],
+                'text': text
+            })
+            block_index += 1
+            continue
+
+        chunks = []
+        curr = []
+        for w in words:
+            curr.append(w)
+            if len(curr) >= max_words:
+                chunks.append(" ".join(curr))
+                curr = []
+        if curr:
+            chunks.append(" ".join(curr))
+
+        match = re.findall(r'([0-9]+:[0-9]+:[0-9]+,[0-9]+)', block['times'])
+        if len(match) == 2:
+            st_sec = convert_to_seconds(match[0])
+            et_sec = convert_to_seconds(match[1])
+            tot_dur = et_sec - st_sec
+            for c_idx, c_text in enumerate(chunks):
+                c_st = st_sec + (c_idx * tot_dur / len(chunks))
+                c_et = st_sec + ((c_idx + 1) * tot_dur / len(chunks))
+                new_blocks.append({
+                    'index': str(block_index),
+                    'times': f"{format_srt_time(c_st)} --> {format_srt_time(c_et)}",
+                    'text': c_text
+                })
+                block_index += 1
+        else:
+            new_blocks.append({
+                'index': str(block_index),
+                'times': block['times'],
+                'text': text
+            })
+            block_index += 1
+
+    return new_blocks
+
 def main():
     parser = argparse.ArgumentParser(description="Generate Hindi voiceover short video with English subtitles.")
     parser.add_argument("--subject", required=True, help="Video subject (e.g. 'mysteries of Bhangarh Fort')")
@@ -197,10 +260,14 @@ def main():
             english_idx = min(int(idx * len(english_sentences) / len(blocks)), len(english_sentences) - 1)
             block['text'] = english_sentences[english_idx]
 
+    visual_blocks = blocks.copy()
+
+    # Step 2b: Chunk subtitles into punchy 3-5 word phrases for high-retention Shorts styling
+    blocks = chunk_subtitle_blocks(blocks, max_words=5)
     updated_srt_content = write_srt(blocks)
     with open(subtitle_path, "w", encoding="utf-8") as f:
         f.write(updated_srt_content)
-    logger.info("Successfully updated subtitles with English translation.")
+    logger.info(f"Successfully chunked subtitles into {len(blocks)} punchy 3-5 word subtitle badges.")
 
     # Step 3: Download materials
     logger.info("Downloading b-roll materials...")
@@ -221,7 +288,7 @@ def main():
     target_width, target_height = 1080, 1920
     clips = []
     
-    for idx, block in enumerate(blocks):
+    for idx, block in enumerate(visual_blocks):
         times = block['times']
         match = re.findall(r'([0-9]+:[0-9]+:[0-9]+,[0-9]+)', times)
         if len(match) == 2:
@@ -232,7 +299,7 @@ def main():
             duration = 5.0
             
         video_path = downloaded_videos[idx % len(downloaded_videos)]
-        logger.info(f"Syncing visual {idx+1}/{len(blocks)}: {os.path.basename(video_path)} for {duration:.2f}s (subtitles: {times})")
+        logger.info(f"Syncing visual {idx+1}/{len(visual_blocks)}: {os.path.basename(video_path)} for {duration:.2f}s (subtitles: {times})")
         
         src_clip = VideoFileClip(video_path)
         if src_clip.duration < duration:
