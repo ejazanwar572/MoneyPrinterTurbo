@@ -209,17 +209,78 @@ def main():
         logger.error("Failed to download video materials.")
         sys.exit(1)
 
-    # Step 4: Render final video
-    logger.info("Rendering final video using MoviePy...")
-    final_video_paths, combined_video_paths, *warnings = tm.generate_final_videos(
-        task_id, params, downloaded_videos, audio_path, subtitle_path, audio_duration
+    # Step 4: Build frame-perfect sentence-synced video combined-1.mp4
+    logger.info("Building sentence-synchronized B-roll video...")
+    from moviepy.tools import convert_to_seconds
+    from moviepy.video.io.VideoFileClip import VideoFileClip
+    from moviepy import concatenate_videoclips
+    from moviepy.video.fx.Loop import Loop
+    from app.services import video
+
+    target_width, target_height = 1080, 1920
+    clips = []
+    
+    for idx, block in enumerate(blocks):
+        times = block['times']
+        match = re.findall(r'([0-9]+:[0-9]+:[0-9]+,[0-9]+)', times)
+        if len(match) == 2:
+            st = convert_to_seconds(match[0])
+            et = convert_to_seconds(match[1])
+            duration = max(et - st, 0.5)
+        else:
+            duration = 5.0
+            
+        video_path = downloaded_videos[idx % len(downloaded_videos)]
+        logger.info(f"Syncing visual {idx+1}/{len(blocks)}: {os.path.basename(video_path)} for {duration:.2f}s (subtitles: {times})")
+        
+        src_clip = VideoFileClip(video_path)
+        if src_clip.duration < duration:
+            n_loops = int(duration / src_clip.duration) + 1
+            clip = Loop(n_loops).apply(src_clip).subclipped(0, duration)
+        else:
+            clip = src_clip.subclipped(0, duration)
+            
+        if clip.w != target_width or clip.h != target_height:
+            clip = clip.resized(new_size=(target_width, target_height))
+            
+        clips.append(clip)
+        
+    combined_video_path = os.path.join(task_dir, "combined-1.mp4")
+    final_combined = concatenate_videoclips(clips, method="compose")
+    final_combined.write_videofile(
+        combined_video_path,
+        fps=30,
+        codec="libx264",
+        audio=False,
+        logger=None
+    )
+    for c in clips:
+        c.close()
+    final_combined.close()
+
+    # Step 5: Render final video with subtitles, audio, and BGM
+    logger.info("Rendering final composite video with audio & subtitles...")
+    final_video_path = os.path.join(task_dir, "final-1.mp4")
+    bgm_file_override = None
+    if params.bgm_type == "custom" and params.bgm_file:
+        bgm_file_override = params.bgm_file
+    elif params.bgm_type == "random":
+        from app.services import bgm as bgm_service
+        bgm_files = bgm_service.list_bgm_files()
+        if bgm_files:
+            import random
+            bgm_file_override = random.choice(bgm_files)
+
+    video.generate_video(
+        video_path=combined_video_path,
+        audio_path=audio_path,
+        subtitle_path=subtitle_path,
+        output_file=final_video_path,
+        params=params,
+        bgm_file_override=bgm_file_override,
     )
 
-    if not final_video_paths:
-        logger.error("Video rendering failed.")
-        sys.exit(1)
-
-    final_video = final_video_paths[0]
+    final_video = final_video_path
     logger.info(f"Video rendered successfully at: {final_video}")
 
     # Copy output to project root with a clean name
