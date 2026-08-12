@@ -301,20 +301,30 @@ def main():
     from app.services import video
 
     target_width, target_height = 1080, 1920
+    n_sentences = len(english_sentences)
+    n_blocks = len(visual_blocks)
+
+    sentence_time_ranges = []
+    for s_idx in range(n_sentences):
+        st_block_idx = int(round(s_idx * n_blocks / n_sentences))
+        et_block_idx = int(round((s_idx + 1) * n_blocks / n_sentences)) - 1
+        et_block_idx = max(st_block_idx, min(et_block_idx, n_blocks - 1))
+        if s_idx == n_sentences - 1:
+            et_block_idx = n_blocks - 1
+
+        st_match = re.findall(r'([0-9]+:[0-9]+:[0-9]+,[0-9]+)', visual_blocks[st_block_idx]['times'])
+        et_match = re.findall(r'([0-9]+:[0-9]+:[0-9]+,[0-9]+)', visual_blocks[et_block_idx]['times'])
+
+        st_sec = convert_to_seconds(st_match[0]) if st_match else (s_idx * audio_duration / n_sentences)
+        et_sec = convert_to_seconds(et_match[1]) if (et_match and len(et_match) == 2) else ((s_idx + 1) * audio_duration / n_sentences)
+        duration = max(et_sec - st_sec, 0.5)
+
+        sentence_time_ranges.append((st_sec, et_sec, duration))
+
     clips = []
-    
-    for idx, block in enumerate(visual_blocks):
-        times = block['times']
-        match = re.findall(r'([0-9]+:[0-9]+:[0-9]+,[0-9]+)', times)
-        if len(match) == 2:
-            st = convert_to_seconds(match[0])
-            et = convert_to_seconds(match[1])
-            duration = max(et - st, 0.5)
-        else:
-            duration = 5.0
-            
-        video_path = downloaded_videos[idx % len(downloaded_videos)]
-        logger.info(f"Syncing visual {idx+1}/{len(visual_blocks)}: {os.path.basename(video_path)} for {duration:.2f}s (subtitles: {times})")
+    for s_idx, (st_sec, et_sec, duration) in enumerate(sentence_time_ranges):
+        video_path = downloaded_videos[s_idx % len(downloaded_videos)]
+        logger.info(f"Syncing sentence visual {s_idx+1}/{n_sentences}: {os.path.basename(video_path)} for {duration:.2f}s ({st_sec:.2f}s -> {et_sec:.2f}s)")
         
         src_clip = VideoFileClip(video_path)
         if src_clip.duration < duration:
