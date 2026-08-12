@@ -191,10 +191,11 @@ def main():
     else:
         logger.warning(
             f"SRT block count ({len(blocks)}) does not match English sentence count ({len(english_sentences)}). "
-            "Falling back to sequential mapping."
+            "Using proportional sentence mapping."
         )
-        for idx in range(min(len(blocks), len(english_sentences))):
-            blocks[idx]['text'] = english_sentences[idx]
+        for idx, block in enumerate(blocks):
+            english_idx = min(int(idx * len(english_sentences) / len(blocks)), len(english_sentences) - 1)
+            block['text'] = english_sentences[english_idx]
 
     updated_srt_content = write_srt(blocks)
     with open(subtitle_path, "w", encoding="utf-8") as f:
