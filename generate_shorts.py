@@ -139,6 +139,31 @@ def chunk_subtitle_blocks(blocks, max_words=5):
 
     return new_blocks
 
+def align_subtitles_to_srt(blocks, english_sentences):
+    """
+    Intelligently map English translation across SRT timestamp blocks without text duplication or missing blocks.
+    """
+    if len(blocks) == len(english_sentences):
+        for idx, block in enumerate(blocks):
+            block['text'] = english_sentences[idx]
+        return blocks
+
+    full_english_text = " ".join(english_sentences)
+    all_words = full_english_text.split()
+    total_blocks = len(blocks)
+    words_per_block = len(all_words) / total_blocks
+
+    for idx, block in enumerate(blocks):
+        st_word_idx = int(round(idx * words_per_block))
+        end_word_idx = int(round((idx + 1) * words_per_block))
+        if idx == total_blocks - 1:
+            end_word_idx = len(all_words)
+
+        block_words = all_words[st_word_idx:end_word_idx]
+        block['text'] = " ".join(block_words)
+
+    return blocks
+
 def main():
     parser = argparse.ArgumentParser(description="Generate Hindi voiceover short video with English subtitles.")
     parser.add_argument("--subject", required=True, help="Video subject (e.g. 'mysteries of Bhangarh Fort')")
@@ -247,18 +272,8 @@ def main():
     blocks = parse_srt(srt_content)
     logger.info(f"Found {len(blocks)} subtitle blocks in SRT.")
 
-    # Align English sentences to SRT blocks
-    if len(blocks) == len(english_sentences):
-        for idx, block in enumerate(blocks):
-            block['text'] = english_sentences[idx]
-    else:
-        logger.warning(
-            f"SRT block count ({len(blocks)}) does not match English sentence count ({len(english_sentences)}). "
-            "Using proportional sentence mapping."
-        )
-        for idx, block in enumerate(blocks):
-            english_idx = min(int(idx * len(english_sentences) / len(blocks)), len(english_sentences) - 1)
-            block['text'] = english_sentences[english_idx]
+    # Align English translation across SRT blocks continuously without sentence duplication
+    blocks = align_subtitles_to_srt(blocks, english_sentences)
 
     visual_blocks = blocks.copy()
 
