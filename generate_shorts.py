@@ -174,6 +174,7 @@ def main():
     parser.add_argument("--bgm-type", default="random", choices=["random", "custom", "none"], help="Background music type: random, custom, or none")
     parser.add_argument("--bgm-file", default="", help="Path to custom background music audio file (if --bgm-type is custom)")
     parser.add_argument("--bgm-volume", type=float, default=0.15, help="Background music volume (0.0 to 1.0, default 0.15)")
+    parser.add_argument("--font-size", type=int, default=42, help="Font size for subtitle badges (default 42, down from 60 for sleek mobile aesthetics)")
     args = parser.parse_args()
 
     # Pre-Flight Configuration Checks
@@ -240,6 +241,7 @@ def main():
         voice_name="hi-IN-SwaraNeural",
         subtitle_enabled=True,
         font_name="STHeitiMedium.ttc",
+        font_size=args.font_size,
         rounded_subtitle_background=True,
         text_background_color=True,
         video_concat_mode="sequential",

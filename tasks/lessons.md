@@ -15,3 +15,7 @@
 ## 4. Culturally Accurate Stock B-Roll Queries
 - **Rule:** Avoid generic queries like "red flag" or "priest" which pull irrelevant foreign stock footage (e.g., Turkish flags).
 - **Enforcement:** Always use explicit, subject-accurate queries such as "indian temple flag saffron", "hindu priest temple tower", "ancient indian stone temple aerial".
+
+## 5. Subtitle Font Size & Aesthetics
+- **Rule:** Never use oversized font sizes (e.g. `60`) for subtitle badges on vertical 9:16 mobile screens. Large font sizes obscure video visuals and look unpolished.
+- **Enforcement:** Default font size is set to `42` pt for sleek, elegant, highly readable subtitle badges that maintain 85%+ visual screen visibility.
